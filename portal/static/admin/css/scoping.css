@@ -1,0 +1,13 @@
+/* Hide the "Delete", "Add Another" and "Continue" buttons  */
+.deletelink-box, input[name="_addanother"]{
+    display: none;
+}
+
+td.original p {
+  visibility: hidden
+}
+
+.inline-group .tabular tr.has_original td {
+    padding-top: 10px;
+
+}
