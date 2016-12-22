@@ -4,6 +4,9 @@ from import_export import resources
 from import_export.admin import ImportExportActionModelAdmin
 from import_export.widgets import ForeignKeyWidget, DecimalWidget
 from import_export import fields
+from django.http import JsonResponse, HttpResponseForbidden
+from django.contrib.admin import helpers
+from django.template import loader, Context
 
 
 class ClientAdmin(ImportExportActionModelAdmin):
@@ -56,12 +59,16 @@ class PricingInline(admin.TabularInline):
     model = models.Pricing
 
     fields = ('language', 'get_formatted_prep_kits_value', 'get_formatted_trans_value', 'get_formatted_mm_prep_value',
-              'get_formatted_vo_prep_value', 'get_formatted_video_loc_value', 'dtp', 'course_qa',
-              'course_finalize', 'pm', 'total', 'tat')
+              'get_formatted_vo_prep_value', 'get_formatted_video_loc_value', 'get_formatted_dtp_value',
+              'get_formatted_course_build_value', 'get_formatted_course_qa_value',
+              'get_formatted_course_finalize_value', 'get_formatted_pm_value', 'get_formatted_total_value',
+              'get_tat_value')
 
     readonly_fields = ('get_formatted_prep_kits_value', 'get_formatted_trans_value', 'get_formatted_mm_prep_value',
-                       'get_formatted_vo_prep_value', 'get_formatted_video_loc_value', 'dtp', 'course_qa',
-                       'course_finalize', 'pm', 'total', 'tat')
+                       'get_formatted_vo_prep_value', 'get_formatted_video_loc_value', 'get_formatted_dtp_value',
+                       'get_formatted_course_build_value', 'get_formatted_course_qa_value',
+                       'get_formatted_course_finalize_value', 'get_formatted_pm_value', 'get_formatted_total_value',
+                       'get_tat_value')
 
     extra = 1
 
@@ -70,7 +77,7 @@ class PricingInline(admin.TabularInline):
 
 
 class ScopingAdmin(admin.ModelAdmin):
-    inlines = (PricingInline,)
+    inlines = [PricingInline, ]
     fieldsets = (
         (None, {
             'fields': ('name', 'client', ('course_play_time', 'narration_time', 'embedded_video_time', 'video_count',
@@ -86,48 +93,76 @@ class ScopingAdmin(admin.ModelAdmin):
 
     actions_on_bottom = True
     actions_on_top = False
-    # actions = None
+    save_on_top = True
 
     # Show or hide delete action depending on user
-    # def get_actions(self, request):
+    def get_actions(self, request):
+        actions = super(ScopingAdmin, self).get_actions(request)
+        if not request.user.is_superuser:
+            if 'delete_selected' in actions:
+                del actions['delete_selected']
+        return actions
+
+    # def get_list_editable(self, request):
     #     actions = super(ScopingAdmin, self).get_actions(request)
-    #     if request.user.username[0].upper() != 'J':
+    #     if not request.user.is_superuser:
+    #         global list_editable
+    #         list_editable = None
     #         if 'delete_selected' in actions:
     #             del actions['delete_selected']
-    #     return actions
+    #     return actions, list_editable
 
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        editable = True
 
-    # def response_add(self, request, obj, post_url_continue=None):
-    #     obj = self.after_saving_model_and_related_inlines(obj)
-    #     return super(ScopingAdmin, self).response_add(request, obj)
-    #
-    # def response_change(self, request, obj):
-    #     obj = self.after_saving_model_and_related_inlines(obj)
-    #     return super(ScopingAdmin, self).response_change(request, obj)
-    #
-    # def after_saving_model_and_related_inlines(self, obj):
-    #     if hasattr(obj, "related_set"):
-    #         print(obj.related_set.all())
-    #     # now we have what we need here... :)
-    #     return obj
+        if (not editable) and (not request.user.is_superuser) and request.method == 'POST':
+            return HttpResponseForbidden("You do not have permissions to change this estimate")
 
+        more_context = {
+            # set a context var telling our customized template to suppress the Save button group
+            'my_editable': editable,
+        }
+        more_context.update(extra_context or {})
+        return super(ScopingAdmin, self).change_view(request, object_id, form_url, more_context)
 
+    def response_change(self, request, obj):
+        if request.is_ajax() and ('_languageupdate' in request.POST and request.POST['_languageupdate'] == '1'):
+            # get all possible inlines for the parent Admin
+            inline = None
+            formset = None
+            prefixes = {}
+            for FormSet, inline in zip(self.get_formsets_with_inlines(request, obj),
+                                       self.get_inline_instances(request)):
+                # get the inline of interest and generate it's formset
+                if isinstance(inline, PricingInline):
+                    prefix = FormSet[0].get_default_prefix()
+                    prefixes[prefix] = prefixes.get(prefix, 0) + 1
+                    if prefixes[prefix] != 1 or not prefix:
+                        prefix = "%s-%s" % (prefix, prefixes[prefix])
+                    formset = FormSet[0](instance=obj, prefix=prefix)
 
+            # get possible fieldsets, readonly, and prepopulated information for the parent Admin
+            fieldsets = list(inline.get_fieldsets(request, obj))
+            readonly = list(inline.get_readonly_fields(request, obj))
+            prepopulated = dict(inline.get_prepopulated_fields(request, obj))
 
-    # http://guido.vonrudorff.de/django-admin-post-save-hook-for-foreign-keys-with-inline-forms/
-    # def save_related(self, request, form, formsets, change):
-    #     # here is the place for pre_save actions - nothing has been written to the database, yet
-    #     super(type(self), self).save_related(request, form, formsets, change)
-    #     # now you have all objects in the database
-    #     if not change:
-    #         pass
+            # generate the inline formset
+            inline_admin_formset = helpers.InlineAdminFormSet(inline, formset, fieldsets, prepopulated, readonly,
+                                                              model_admin=self)
+
+            # render the template
+            t = loader.get_template('admin/edit_inline/tabular.html')
+            c = Context({'inline_admin_formset': inline_admin_formset})
+            rendered_inline_form = t.render(c)
+            return JsonResponse({'status': 'languages updated!', 'inline_form': rendered_inline_form})
+        return super(ScopingAdmin, self).response_change(request, obj)
 
     class Media:
         def __init__(self):
             pass
-        js = ('admin/js/admin_list_editable_autosubmit.js',)
-        css = {'all': ('admin/css/scoping.css', )}
+        js = ('portal/admin/js/admin_list_editable_autosubmit.js',
+              'portal/admin/js/formset_handlers.js')
+        css = {'all': ('portal/admin/css/scoping.css', )}
 
 
 admin.site.register(models.Scoping, ScopingAdmin)
-

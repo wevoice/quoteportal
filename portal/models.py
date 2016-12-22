@@ -1,6 +1,8 @@
 from __future__ import unicode_literals
 
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.utils.timezone import get_current_timezone
 import datetime
 import math
@@ -18,6 +20,10 @@ def localize_datetime(dtime):
 
 def mround(x, prec=2, base=.5):
     return round(base * round(float(x)/base), prec)
+
+
+def roundup(x):
+    return math.ceil(x / 10.0) * 10
 
 
 class Client(models.Model):
@@ -49,12 +55,12 @@ class Scoping(models.Model):
     )
     name = models.CharField(max_length=128, blank=True, null=True)
     client = models.ForeignKey("Client", blank=True, null=True)
-    course_play_time = models.IntegerField(blank=True, null=True)
-    narration_time = models.IntegerField(blank=True, null=True)
-    embedded_video_time = models.IntegerField(blank=True, null=True)
-    video_count = models.IntegerField(blank=True, null=True)
-    transcription = models.CharField(max_length=8, choices=YES_NO_CHOICES, blank=True, null=True)
-    linked_resources = models.IntegerField(blank=True, null=True)
+    course_play_time = models.IntegerField(blank=True, null=True, default=0)
+    narration_time = models.IntegerField(blank=True, null=True, default=0)
+    embedded_video_time = models.IntegerField(blank=True, null=True, default=0)
+    video_count = models.IntegerField(blank=True, null=True, default=0)
+    transcription = models.CharField(max_length=8, choices=YES_NO_CHOICES, blank=True, null=True, default="N")
+    linked_resources = models.IntegerField(blank=True, null=True, default=0)
     created_date = models.DateTimeField(auto_now_add=True)
     last_updated = models.DateTimeField(auto_now=True)
     total_words = models.IntegerField(blank=True, null=True)
@@ -65,17 +71,16 @@ class Scoping(models.Model):
         return localize_datetime(self.created)
 
     def get_total_words(self):
-        return self.course_play_time * 92 \
-                       + self.narration_time * 150 \
-                       + self.video_count * 8 \
-                       + self.linked_resources * 300
+        return math.ceil(sum([(self.course_play_time * 92), (self.narration_time * 150), (self.embedded_video_time * 8),
+                              (self.linked_resources * 300)]))
 
     def get_ost_elements(self):
-        return int(self.embedded_video_time * 2.5)
+        return math.ceil(self.embedded_video_time * 2.5)
 
     class Meta:
         verbose_name = "Estimate"
         verbose_name_plural = "Estimates"
+        unique_together = ('name', 'client',)
 
     def __unicode__(self):
         return self.name
@@ -86,6 +91,14 @@ class Scoping(models.Model):
         for pricing_set in self.pricing_set.all():
             pricing_set.save()
         super(Scoping, self).save(*args, **kwargs)
+
+
+@receiver(post_save, sender=Scoping)
+def create_source_language(sender, instance, created, **kwargs):
+    if created and instance.pricing_set.count() == 0:
+        language = Language.objects.get(code='en-US')
+        pricing = Pricing.objects.create(scoping=instance, language=language)
+        pricing.save()
 
 
 class Pricing(models.Model):
@@ -118,7 +131,7 @@ class Pricing(models.Model):
         return prep_kits_value
 
     def get_formatted_prep_kits_value(self):
-        return '${0}'.format(self.get_prep_kits_value())
+        return '${0:.2f}'.format(self.get_prep_kits_value())
     get_formatted_prep_kits_value.short_description = 'Prep Kits'
 
     def get_trans_value(self):
@@ -132,7 +145,7 @@ class Pricing(models.Model):
         return translation_value
 
     def get_formatted_trans_value(self):
-        return '${0}'.format(self.get_trans_value())
+        return '${0:.2f}'.format(self.get_trans_value())
     get_formatted_trans_value.short_description = 'Translation'
 
     def get_mm_prep_value(self):
@@ -149,7 +162,7 @@ class Pricing(models.Model):
         return prep_kits_value
 
     def get_formatted_mm_prep_value(self):
-        return '${0}'.format(self.get_mm_prep_value())
+        return '${0:.2f}'.format(self.get_mm_prep_value())
     get_formatted_mm_prep_value.short_description = 'MM Prep'
 
     def get_vo_prep_value(self):
@@ -163,7 +176,7 @@ class Pricing(models.Model):
         return vo_prep_value
 
     def get_formatted_vo_prep_value(self):
-        return '${0}'.format(self.get_vo_prep_value())
+        return '${0:.2f}'.format(self.get_vo_prep_value())
     get_formatted_vo_prep_value.short_description = 'VO Prep'
 
     def get_video_loc_value(self):
@@ -171,15 +184,125 @@ class Pricing(models.Model):
             lang = self.language.id
             sla_lang = self.scoping.client.sla_set.filter(target_language_id=lang)
             mm_eng_rate = sla_lang[0].mm_eng
-            video_loc_value = (mround(self.scoping.ost_elements / 10.0)*float(mm_eng_rate))\
+            video_loc_value = (mround(self.scoping.ost_elements / 10)*float(mm_eng_rate))\
                 + float(0.25 * self.scoping.video_count * float(mm_eng_rate))
         else:
             video_loc_value = 0.00
         return video_loc_value
 
     def get_formatted_video_loc_value(self):
-        return '${0}'.format(self.get_video_loc_value())
+        return '${0:.2f}'.format(self.get_video_loc_value())
     get_formatted_video_loc_value.short_description = 'Video Loc'
+
+    def get_dtp_value(self):
+        if self.language.code != 'en-US':
+            lang = self.language.id
+            sla_lang = self.scoping.client.sla_set.filter(target_language_id=lang)
+            dtp_rate = sla_lang[0].dtp
+            dtp_value = mround(self.scoping.linked_resources / 15.0)*float(dtp_rate)
+        else:
+            dtp_value = 0.00
+        return dtp_value
+
+    def get_formatted_dtp_value(self):
+        return '${0}'.format(self.get_dtp_value())
+    get_formatted_dtp_value.short_description = 'DTP'
+
+    def get_course_build_value(self):
+        if self.language.code != 'en-US':
+            lang = self.language.id
+            sla_lang = self.scoping.client.sla_set.get(target_language_id=lang)
+            mm_eng_rate = sla_lang.mm_eng
+            course_build_value = mround(self.scoping.course_play_time / 15.0 + self.scoping.narration_time / 10.0)\
+                * float(mm_eng_rate)
+        else:
+            course_build_value = 0.00
+        return course_build_value
+
+    def get_formatted_course_build_value(self):
+        return '${0:.2f}'.format(self.get_course_build_value())
+    get_formatted_course_build_value.short_description = 'Course Build'
+
+    def get_course_qa_value(self):
+        if self.language.code != 'en-US':
+            lang = self.language.id
+            sla_lang = self.scoping.client.sla_set.get(target_language_id=lang)
+            qa_rate = sla_lang.qa
+            course_qa_value = mround(self.scoping.course_play_time * 5.0/60) * float(qa_rate)
+        else:
+            course_qa_value = 0.00
+        return course_qa_value
+
+    def get_formatted_course_qa_value(self):
+        return '${0:.2f}'.format(self.get_course_qa_value())
+    get_formatted_course_qa_value.short_description = 'Course QA'
+
+    def get_course_finalize_value(self):
+        if self.language.code != 'en-US':
+            course_finalize_value = sum([self.get_mm_prep_value(), self.get_vo_prep_value(), self.get_video_loc_value(),
+                                         self.get_dtp_value(), self.get_course_build_value(), self.get_course_qa_value()
+                                         ]) * 0.25
+        else:
+            course_finalize_value = 0.00
+        return course_finalize_value
+
+    def get_formatted_course_finalize_value(self):
+        return '${0:.2f}'.format(self.get_course_finalize_value())
+    get_formatted_course_finalize_value.short_description = 'Course Finalize'
+
+    def get_pm_value(self):
+        if self.language.code != 'en-US':
+            lang = self.language.id
+            sla_lang = self.scoping.client.sla_set.get(target_language_id=lang)
+            pm_rate = sla_lang.pm
+            base_value = sum([self.get_trans_value(), self.get_mm_prep_value(), self.get_vo_prep_value(),
+                              self.get_video_loc_value(), self.get_dtp_value(), self.get_course_build_value(),
+                              self.get_course_qa_value(), self.get_course_finalize_value()]) * float(pm_rate)
+            pm_value = float(format(base_value, '.2f'))
+        else:
+            pm_value = float(format(self.get_prep_kits_value() * .08, '.2f'))
+        return pm_value
+
+    def get_formatted_pm_value(self):
+        return '${0:.2f}'.format(self.get_pm_value())
+    get_formatted_pm_value.short_description = 'PM'
+
+    def get_total_value(self):
+        if self.language.code != 'en-US':
+            total = sum([self.get_trans_value(), self.get_mm_prep_value(), self.get_vo_prep_value(),
+                                   self.get_video_loc_value(), self.get_dtp_value(), self.get_course_build_value(),
+                                   self.get_course_qa_value(), self.get_course_finalize_value(), self.get_pm_value()])
+        else:
+            total = sum([self.get_prep_kits_value(), self.get_pm_value()])
+        return total
+
+    def get_formatted_total_value(self):
+        return '${0:.2f}'.format(self.get_total_value())
+    get_formatted_total_value.short_description = 'Total'
+
+    def get_tat_value_base(self, tat_unit):
+        tat_value = 3
+        if tat_unit < 120:
+            tat_value = 1
+        elif tat_unit < 180:
+            tat_value = 2
+        return tat_value
+
+    def get_tat_value(self):
+        if self.language.code == 'en-US':
+            tat_value = 3
+            if self.scoping.course_play_time < 180:
+                tat_value = 1
+            elif self.scoping.course_play_time < 360:
+                tat_value = 2
+        else:
+            tat_value = math.ceil(sum([self.scoping.total_words/2000,
+                                       6,
+                                       self.get_tat_value_base(self.scoping.embedded_video_time),
+                                       math.ceil(self.scoping.course_play_time/15),
+                                       2
+                                       ]) * 1.2)
+        return tat_value
 
     def save(self, *args, **kwargs):
         self.prep_kits = self.get_prep_kits_value()
