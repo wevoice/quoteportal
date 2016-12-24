@@ -175,23 +175,23 @@ class DynamicPricingInline(PricingInline):
                 value = getattr(obj, attribute)
                 if value > 0 and requirement not in target_fields:
                     target_fields.append(requirement)
-                elif value == 0 and requirement in target_fields:
-                    related_keys = [k for k, v in requirements_dict.iteritems() if item in v]
-                    sum_of_vals = 0
-                    for key in related_keys:
-                        sum_of_vals += getattr(obj, key)
-                    if sum_of_vals == 0:
-                        target_fields.remove(requirement)
+                # elif value == 0 and requirement in target_fields:
+                #     related_keys = [k for k, v in requirements_dict.iteritems() if item in v]
+                #     sum_of_vals = 0
+                #     for key in related_keys:
+                #         sum_of_vals += getattr(obj, key)
+                #     if sum_of_vals == 0:
+                #         target_fields.remove(requirement)
 
         if len(target_fields) > 1:
             target_fields.append(columns_dict['pm'])
             target_fields.append(columns_dict['total'])
             target_fields.append(columns_dict['tat'])
 
-        if len(target_fields) == 4:
-            target_fields.remove(columns_dict['pm'])
-            target_fields.remove(columns_dict['total'])
-            target_fields.remove(columns_dict['tat'])
+        # if len(target_fields) == 4:
+        #     target_fields.remove(columns_dict['pm'])
+        #     target_fields.remove(columns_dict['total'])
+        #     target_fields.remove(columns_dict['tat'])
 
         course_items = ['get_formatted_mm_prep_value', 'get_formatted_vo_prep_value', 'get_formatted_video_loc_value',
                         'get_formatted_dtp_value', 'get_formatted_course_build_value', 'get_formatted_course_qa_value']
@@ -224,13 +224,13 @@ class DynamicPricingInline(PricingInline):
     def get_fields(self, request, obj=None):
         # retrieve current fields
         target_fields = super(DynamicPricingInline, self).get_fields(request, obj)
-
+        target_fields[:] = []
         return self.filter_fields(target_fields, obj, read_only=False)
 
     def get_readonly_fields(self, request, obj=None):
         # retrieve current readonly fields
         target_fields = super(DynamicPricingInline, self).get_readonly_fields(request, obj)
-
+        target_fields[:] = []
         return self.filter_fields(target_fields, obj)
 
 

@@ -55,7 +55,7 @@ class Scoping(models.Model):
     )
     name = models.CharField(max_length=128, blank=True, null=True)
     client = models.ForeignKey("Client", blank=True, null=True)
-    course_play_time = models.IntegerField(blank=True, null=True, default=0, help_text='used in: Prep Kits'he)
+    course_play_time = models.IntegerField(blank=True, null=True, default=0)
     narration_time = models.IntegerField(blank=True, null=True, default=0)
     embedded_video_time = models.IntegerField(blank=True, null=True, default=0)
     video_count = models.IntegerField(blank=True, null=True, default=0)
