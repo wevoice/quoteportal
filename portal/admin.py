@@ -4,9 +4,11 @@ from import_export import resources
 from import_export.admin import ImportExportActionModelAdmin
 from import_export.widgets import ForeignKeyWidget, DecimalWidget
 from import_export import fields
-from django.http import JsonResponse, HttpResponseForbidden
+from django.http import JsonResponse
 from django.contrib.admin import helpers
 from django.template import loader, Context
+from django import forms
+from django.contrib.humanize.templatetags.humanize import intcomma
 
 
 class ClientAdmin(ImportExportActionModelAdmin):
@@ -55,29 +57,186 @@ class SlaAdmin(ImportExportActionModelAdmin):
 admin.site.register(models.Sla, SlaAdmin)
 
 
+class PricingInlineForm(forms.ModelForm):
+    def clean(self):
+        if self.is_valid():
+            for attribute in ['embedded_video_time', 'narration_time', 'course_play_time',
+                              'video_count', 'linked_resources']:
+                if getattr(self.cleaned_data.get('scoping'), attribute) is None:
+                    setattr(self.cleaned_data.get('scoping'), attribute, 0)
+        return self.cleaned_data
+
+
 class PricingInline(admin.TabularInline):
     model = models.Pricing
-
-    fields = ('language', 'get_formatted_prep_kits_value', 'get_formatted_trans_value', 'get_formatted_mm_prep_value',
-              'get_formatted_vo_prep_value', 'get_formatted_video_loc_value', 'get_formatted_dtp_value',
-              'get_formatted_course_build_value', 'get_formatted_course_qa_value',
-              'get_formatted_course_finalize_value', 'get_formatted_pm_value', 'get_formatted_total_value',
-              'get_tat_value')
-
-    readonly_fields = ('get_formatted_prep_kits_value', 'get_formatted_trans_value', 'get_formatted_mm_prep_value',
-                       'get_formatted_vo_prep_value', 'get_formatted_video_loc_value', 'get_formatted_dtp_value',
-                       'get_formatted_course_build_value', 'get_formatted_course_qa_value',
-                       'get_formatted_course_finalize_value', 'get_formatted_pm_value', 'get_formatted_total_value',
-                       'get_tat_value')
-
     extra = 1
+    form = PricingInlineForm
 
-    def translation(self):
-        return "$%s" % self.translation if self.translation else ""
+    fields = ['language', ]
+    readonly_fields = []
+
+    # def get_formset(self, request, obj=None, **kwargs):
+    #     pets = ((0, 'Dogs'), (1, 'Cats'))
+    #     wildanimals = ((0, 'Lion'), (1, 'Tiger'))
+    #     # Break this line appart to add your own dict of form fields.
+    #     # Also a handy not is you have an instance of the parent object in obj
+    #     PricingInline.form = type('PricingFormAlt', (PricingInlineForm,),
+    #                               {'pets_select': forms.ChoiceField(label="Pets", choices=pets),
+    #                                'get_formatted_prep_kits_value': forms.CharField(label="Prep Kits"),
+    #                                'get_formatted_trans_value': forms.CharField(label="Translation"),})
+    #     formset = super(PricingInline, self).get_formset(request, obj, **kwargs)
+    #     return formset
+
+    def get_formatted_prep_kits_value(self, obj):
+        return "$%s" % intcomma('{0:.2f}'.format(obj.get_prep_kits_value()))
+    get_formatted_prep_kits_value.short_description = 'Prep Kits'
+
+    def get_formatted_trans_value(self, obj):
+        return "$%s" % intcomma('{0:.2f}'.format(obj.get_trans_value()))
+    get_formatted_trans_value.short_description = 'Translation'
+
+    def get_formatted_mm_prep_value(self, obj):
+        return "$%s" % intcomma('{0:.2f}'.format(obj.get_mm_prep_value()))
+    get_formatted_mm_prep_value.short_description = 'MM Prep'
+
+    def get_formatted_vo_prep_value(self, obj):
+        return "$%s" % intcomma('{0:.2f}'.format(obj.get_vo_prep_value()))
+    get_formatted_vo_prep_value.short_description = 'VO Prep'
+
+    def get_formatted_video_loc_value(self, obj):
+        return "$%s" % intcomma('{0:.2f}'.format(obj.get_video_loc_value()))
+    get_formatted_video_loc_value.short_description = 'Video Loc'
+
+    def get_formatted_dtp_value(self, obj):
+        return "$%s" % intcomma('{0:.2f}'.format(obj.get_dtp_value()))
+    get_formatted_dtp_value.short_description = 'DTP'
+
+    def get_formatted_course_build_value(self, obj):
+        return "$%s" % intcomma('{0:.2f}'.format(obj.get_course_build_value()))
+    get_formatted_course_build_value.short_description = 'Course Build'
+
+    def get_formatted_course_qa_value(self, obj):
+        return "$%s" % intcomma('{0:.2f}'.format(obj.get_course_qa_value()))
+    get_formatted_course_qa_value.short_description = 'Course QA'
+
+    def get_formatted_course_finalize_value(self, obj):
+        return "$%s" % intcomma('{0:.2f}'.format(obj.get_course_finalize_value()))
+    get_formatted_course_finalize_value.short_description = 'Course Finalize'
+
+    def get_formatted_pm_value(self, obj):
+        return "$%s" % intcomma('{0:.2f}'.format(obj.get_pm_value()))
+    get_formatted_pm_value.short_description = 'PM'
+
+    def get_formatted_total_value(self, obj):
+        return "$%s" % intcomma('{0:.2f}'.format(obj.get_total_value()))
+    get_formatted_total_value.short_description = 'Total'
+
+    def get_formatted_tat_value(self, obj):
+        return "%s" % intcomma('{0:.2f}'.format(obj.get_tat_value()))
+    get_formatted_tat_value.short_description = 'TAT'
+
+
+class DynamicPricingInline(PricingInline):
+    def filter_fields(self, target_fields, obj, read_only=True):
+        requirements_dict = {}
+        requirements_dict.setdefault('course_play_time', []).append('prep_kits')
+        requirements_dict.setdefault('total_words', []).append('translation')
+        requirements_dict.setdefault('video_count', []).append('mm_prep')
+        requirements_dict.setdefault('narration_time', []).append('mm_prep')
+        requirements_dict.setdefault('embedded_video_time', []).append('vo_prep')
+        requirements_dict.setdefault('ost_elements', []).append('video_loc')
+        requirements_dict.setdefault('video_count', []).append('video_loc')
+        requirements_dict.setdefault('linked_resources', []).append('dtp')
+        requirements_dict.setdefault('course_play_time', []).append('course_build')
+        requirements_dict.setdefault('narration_time', []).append('course_build')
+        requirements_dict.setdefault('course_play_time', []).append('course_qa')
+
+        columns_dict = {
+            'prep_kits': 'get_formatted_prep_kits_value',
+            'translation': 'get_formatted_trans_value',
+            'mm_prep': 'get_formatted_mm_prep_value',
+            'vo_prep': 'get_formatted_vo_prep_value',
+            'video_loc': 'get_formatted_video_loc_value',
+            'dtp': 'get_formatted_dtp_value',
+            'course_build': 'get_formatted_course_build_value',
+            'course_qa': 'get_formatted_course_qa_value',
+            'course_finalize': 'get_formatted_course_finalize_value',
+            'pm': 'get_formatted_pm_value',
+            'total': 'get_formatted_total_value',
+            'tat': 'get_formatted_tat_value'
+        }
+
+        for attribute in ['course_play_time', 'narration_time', 'embedded_video_time', 'video_count',
+                          'linked_resources', 'total_words', 'ost_elements']:
+
+            requirements = requirements_dict[attribute]
+            for item in requirements:
+                requirement = columns_dict[item]
+                value = getattr(obj, attribute)
+                if value > 0 and requirement not in target_fields:
+                    target_fields.append(requirement)
+                elif value == 0 and requirement in target_fields:
+                    related_keys = [k for k, v in requirements_dict.iteritems() if item in v]
+                    sum_of_vals = 0
+                    for key in related_keys:
+                        sum_of_vals += getattr(obj, key)
+                    if sum_of_vals == 0:
+                        target_fields.remove(requirement)
+
+        if len(target_fields) > 1:
+            target_fields.append(columns_dict['pm'])
+            target_fields.append(columns_dict['total'])
+            target_fields.append(columns_dict['tat'])
+
+        if len(target_fields) == 4:
+            target_fields.remove(columns_dict['pm'])
+            target_fields.remove(columns_dict['total'])
+            target_fields.remove(columns_dict['tat'])
+
+        course_items = ['get_formatted_mm_prep_value', 'get_formatted_vo_prep_value', 'get_formatted_video_loc_value',
+                        'get_formatted_dtp_value', 'get_formatted_course_build_value', 'get_formatted_course_qa_value']
+
+        has_course = any((True for field in target_fields if field in course_items))
+        if 'get_formatted_course_finalize_value' not in target_fields:
+            if has_course:
+                target_fields.append('get_formatted_course_finalize_value')
+        else:
+            if not has_course:
+                target_fields.remove('get_formatted_course_finalize_value')
+
+        if read_only:
+            sorted_target_fields = []
+        else:
+            sorted_target_fields = ['language']
+
+        columns_list = ['get_formatted_prep_kits_value', 'get_formatted_trans_value', 'get_formatted_mm_prep_value',
+                        'get_formatted_vo_prep_value', 'get_formatted_video_loc_value', 'get_formatted_dtp_value',
+                        'get_formatted_course_build_value', 'get_formatted_course_qa_value',
+                        'get_formatted_course_finalize_value', 'get_formatted_pm_value', 'get_formatted_total_value',
+                        'get_formatted_tat_value']
+
+        for item in columns_list:
+            if item in target_fields:
+                sorted_target_fields.append(item)
+
+        return sorted_target_fields
+
+    def get_fields(self, request, obj=None):
+        # retrieve current fields
+        target_fields = super(DynamicPricingInline, self).get_fields(request, obj)
+
+        return self.filter_fields(target_fields, obj, read_only=False)
+
+    def get_readonly_fields(self, request, obj=None):
+        # retrieve current readonly fields
+        target_fields = super(DynamicPricingInline, self).get_readonly_fields(request, obj)
+
+        return self.filter_fields(target_fields, obj)
 
 
 class ScopingAdmin(admin.ModelAdmin):
-    inlines = [PricingInline, ]
+    inlines = [DynamicPricingInline, ]
+
     fieldsets = (
         (None, {
             'fields': ('name', 'client', ('course_play_time', 'narration_time', 'embedded_video_time', 'video_count',
@@ -93,7 +252,6 @@ class ScopingAdmin(admin.ModelAdmin):
 
     actions_on_bottom = True
     actions_on_top = False
-    save_on_top = True
 
     # Show or hide delete action depending on user
     def get_actions(self, request):
@@ -102,28 +260,6 @@ class ScopingAdmin(admin.ModelAdmin):
             if 'delete_selected' in actions:
                 del actions['delete_selected']
         return actions
-
-    # def get_list_editable(self, request):
-    #     actions = super(ScopingAdmin, self).get_actions(request)
-    #     if not request.user.is_superuser:
-    #         global list_editable
-    #         list_editable = None
-    #         if 'delete_selected' in actions:
-    #             del actions['delete_selected']
-    #     return actions, list_editable
-
-    def change_view(self, request, object_id, form_url='', extra_context=None):
-        editable = True
-
-        if (not editable) and (not request.user.is_superuser) and request.method == 'POST':
-            return HttpResponseForbidden("You do not have permissions to change this estimate")
-
-        more_context = {
-            # set a context var telling our customized template to suppress the Save button group
-            'my_editable': editable,
-        }
-        more_context.update(extra_context or {})
-        return super(ScopingAdmin, self).change_view(request, object_id, form_url, more_context)
 
     def response_change(self, request, obj):
         if request.is_ajax() and ('_languageupdate' in request.POST and request.POST['_languageupdate'] == '1'):

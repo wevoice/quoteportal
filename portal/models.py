@@ -55,7 +55,7 @@ class Scoping(models.Model):
     )
     name = models.CharField(max_length=128, blank=True, null=True)
     client = models.ForeignKey("Client", blank=True, null=True)
-    course_play_time = models.IntegerField(blank=True, null=True, default=0)
+    course_play_time = models.IntegerField(blank=True, null=True, default=0, help_text='used in: Prep Kits'he)
     narration_time = models.IntegerField(blank=True, null=True, default=0)
     embedded_video_time = models.IntegerField(blank=True, null=True, default=0)
     video_count = models.IntegerField(blank=True, null=True, default=0)
@@ -104,18 +104,18 @@ def create_source_language(sender, instance, created, **kwargs):
 class Pricing(models.Model):
     scoping = models.ForeignKey("Scoping", blank=True, null=True)
     language = models.ForeignKey("Language", blank=True, null=True)
-    prep_kits = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
-    translation = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
-    mm_prep = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
-    vo = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
-    video_loc = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
-    dtp = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
-    course_build = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
-    course_qa = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
-    course_finalize = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
-    pm = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
-    total = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
-    tat = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
+    prep_kits = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    translation = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    mm_prep = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    vo = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    video_loc = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    dtp = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    course_build = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    course_qa = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    course_finalize = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    pm = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    total = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    tat = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     created_date = models.DateTimeField(auto_now_add=True, editable=False)
     last_updated = models.DateTimeField(auto_now=True, editable=False)
 
@@ -130,10 +130,6 @@ class Pricing(models.Model):
             prep_kits_value = 0.00
         return prep_kits_value
 
-    def get_formatted_prep_kits_value(self):
-        return '${0:.2f}'.format(self.get_prep_kits_value())
-    get_formatted_prep_kits_value.short_description = 'Prep Kits'
-
     def get_trans_value(self):
         if self.language.code != 'en-US':
             lang = self.language.id
@@ -143,10 +139,6 @@ class Pricing(models.Model):
         else:
             translation_value = 0.00
         return translation_value
-
-    def get_formatted_trans_value(self):
-        return '${0:.2f}'.format(self.get_trans_value())
-    get_formatted_trans_value.short_description = 'Translation'
 
     def get_mm_prep_value(self):
         if self.language.code != 'en-US':
@@ -161,10 +153,6 @@ class Pricing(models.Model):
             prep_kits_value = 0.00
         return prep_kits_value
 
-    def get_formatted_mm_prep_value(self):
-        return '${0:.2f}'.format(self.get_mm_prep_value())
-    get_formatted_mm_prep_value.short_description = 'MM Prep'
-
     def get_vo_prep_value(self):
         if self.language.code != 'en-US':
             lang = self.language.id
@@ -175,24 +163,16 @@ class Pricing(models.Model):
             vo_prep_value = 0.00
         return vo_prep_value
 
-    def get_formatted_vo_prep_value(self):
-        return '${0:.2f}'.format(self.get_vo_prep_value())
-    get_formatted_vo_prep_value.short_description = 'VO Prep'
-
     def get_video_loc_value(self):
         if self.language.code != 'en-US':
             lang = self.language.id
             sla_lang = self.scoping.client.sla_set.filter(target_language_id=lang)
             mm_eng_rate = sla_lang[0].mm_eng
-            video_loc_value = (mround(self.scoping.ost_elements / 10)*float(mm_eng_rate))\
+            video_loc_value = (mround(self.scoping.ost_elements / 10.0, prec=2, base=1)*float(mm_eng_rate))\
                 + float(0.25 * self.scoping.video_count * float(mm_eng_rate))
         else:
             video_loc_value = 0.00
         return video_loc_value
-
-    def get_formatted_video_loc_value(self):
-        return '${0:.2f}'.format(self.get_video_loc_value())
-    get_formatted_video_loc_value.short_description = 'Video Loc'
 
     def get_dtp_value(self):
         if self.language.code != 'en-US':
@@ -204,24 +184,16 @@ class Pricing(models.Model):
             dtp_value = 0.00
         return dtp_value
 
-    def get_formatted_dtp_value(self):
-        return '${0}'.format(self.get_dtp_value())
-    get_formatted_dtp_value.short_description = 'DTP'
-
     def get_course_build_value(self):
         if self.language.code != 'en-US':
             lang = self.language.id
             sla_lang = self.scoping.client.sla_set.get(target_language_id=lang)
             mm_eng_rate = sla_lang.mm_eng
-            course_build_value = mround(self.scoping.course_play_time / 15.0 + self.scoping.narration_time / 10.0)\
+            course_build_value = mround(self.scoping.course_play_time / 15.0 + self.scoping.narration_time / 10.0, prec=2, base=1)\
                 * float(mm_eng_rate)
         else:
             course_build_value = 0.00
         return course_build_value
-
-    def get_formatted_course_build_value(self):
-        return '${0:.2f}'.format(self.get_course_build_value())
-    get_formatted_course_build_value.short_description = 'Course Build'
 
     def get_course_qa_value(self):
         if self.language.code != 'en-US':
@@ -233,10 +205,6 @@ class Pricing(models.Model):
             course_qa_value = 0.00
         return course_qa_value
 
-    def get_formatted_course_qa_value(self):
-        return '${0:.2f}'.format(self.get_course_qa_value())
-    get_formatted_course_qa_value.short_description = 'Course QA'
-
     def get_course_finalize_value(self):
         if self.language.code != 'en-US':
             course_finalize_value = sum([self.get_mm_prep_value(), self.get_vo_prep_value(), self.get_video_loc_value(),
@@ -245,10 +213,6 @@ class Pricing(models.Model):
         else:
             course_finalize_value = 0.00
         return course_finalize_value
-
-    def get_formatted_course_finalize_value(self):
-        return '${0:.2f}'.format(self.get_course_finalize_value())
-    get_formatted_course_finalize_value.short_description = 'Course Finalize'
 
     def get_pm_value(self):
         if self.language.code != 'en-US':
@@ -263,22 +227,14 @@ class Pricing(models.Model):
             pm_value = float(format(self.get_prep_kits_value() * .08, '.2f'))
         return pm_value
 
-    def get_formatted_pm_value(self):
-        return '${0:.2f}'.format(self.get_pm_value())
-    get_formatted_pm_value.short_description = 'PM'
-
     def get_total_value(self):
         if self.language.code != 'en-US':
             total = sum([self.get_trans_value(), self.get_mm_prep_value(), self.get_vo_prep_value(),
-                                   self.get_video_loc_value(), self.get_dtp_value(), self.get_course_build_value(),
-                                   self.get_course_qa_value(), self.get_course_finalize_value(), self.get_pm_value()])
+                         self.get_video_loc_value(), self.get_dtp_value(), self.get_course_build_value(),
+                         self.get_course_qa_value(), self.get_course_finalize_value(), self.get_pm_value()])
         else:
             total = sum([self.get_prep_kits_value(), self.get_pm_value()])
         return total
-
-    def get_formatted_total_value(self):
-        return '${0:.2f}'.format(self.get_total_value())
-    get_formatted_total_value.short_description = 'Total'
 
     def get_tat_value_base(self, tat_unit):
         tat_value = 3
