@@ -158,7 +158,7 @@ class Pricing(models.Model):
             lang = self.language.id
             sla_lang = self.scoping.client.sla_set.filter(target_language_id=lang)
             vo_rate = sla_lang[0].audio_recording_plain
-            vo_prep_value = self.scoping.embedded_video_time * float(vo_rate)
+            vo_prep_value = self.scoping.narration_time * float(vo_rate)
         else:
             vo_prep_value = 0.00
         return vo_prep_value
@@ -189,8 +189,8 @@ class Pricing(models.Model):
             lang = self.language.id
             sla_lang = self.scoping.client.sla_set.get(target_language_id=lang)
             mm_eng_rate = sla_lang.mm_eng
-            course_build_value = mround(self.scoping.course_play_time / 15.0 + self.scoping.narration_time / 10.0, prec=2, base=1)\
-                * float(mm_eng_rate)
+            course_build_value = mround(self.scoping.course_play_time / 15.0
+                                        + self.scoping.narration_time / 10.0, prec=2, base=1) * float(mm_eng_rate)
         else:
             course_build_value = 0.00
         return course_build_value

@@ -51,6 +51,10 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'quoteportal.urls'
 
+TEMPLATE_CONTEXT_PROCESSORS = (
+    "django.template.context_processors.request",
+)
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',

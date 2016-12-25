@@ -1,5 +1,5 @@
 /* Hide the "Delete", "Add Another" and "Continue" buttons  */
-.deletelink-box, input[name="_addanother"]{
+.deletelink-box, input[name="_addanother"], input[name="_save"]{
     display: none;
 }
 

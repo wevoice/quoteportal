@@ -3,13 +3,5 @@
 
 {% block admin_change_form_document_ready %}
 {{ block.super }}
-<script type="text/javascript">
-    django.jQuery(document).on('formset:added', function(event, $row, formsetName) {
-        console.log('formset has been added');
-        if (formsetName == 'pricing_set') {
-            console.log('pricing set added')
-        }
-    })
-</script>
 <script type="text/javascript" src="{% static 'portal/admin/js/formset_handlers.js' %}"></script>
 {% endblock %}

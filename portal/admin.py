@@ -9,6 +9,7 @@ from django.contrib.admin import helpers
 from django.template import loader, Context
 from django import forms
 from django.contrib.humanize.templatetags.humanize import intcomma
+from django.http import HttpResponseRedirect
 
 
 class ClientAdmin(ImportExportActionModelAdmin):
@@ -137,101 +138,92 @@ class PricingInline(admin.TabularInline):
 
 
 class DynamicPricingInline(PricingInline):
-    def filter_fields(self, target_fields, obj, read_only=True):
-        requirements_dict = {}
-        requirements_dict.setdefault('course_play_time', []).append('prep_kits')
-        requirements_dict.setdefault('total_words', []).append('translation')
-        requirements_dict.setdefault('video_count', []).append('mm_prep')
-        requirements_dict.setdefault('narration_time', []).append('mm_prep')
-        requirements_dict.setdefault('embedded_video_time', []).append('vo_prep')
-        requirements_dict.setdefault('ost_elements', []).append('video_loc')
-        requirements_dict.setdefault('video_count', []).append('video_loc')
-        requirements_dict.setdefault('linked_resources', []).append('dtp')
-        requirements_dict.setdefault('course_play_time', []).append('course_build')
-        requirements_dict.setdefault('narration_time', []).append('course_build')
-        requirements_dict.setdefault('course_play_time', []).append('course_qa')
-
-        columns_dict = {
-            'prep_kits': 'get_formatted_prep_kits_value',
-            'translation': 'get_formatted_trans_value',
-            'mm_prep': 'get_formatted_mm_prep_value',
-            'vo_prep': 'get_formatted_vo_prep_value',
-            'video_loc': 'get_formatted_video_loc_value',
-            'dtp': 'get_formatted_dtp_value',
-            'course_build': 'get_formatted_course_build_value',
-            'course_qa': 'get_formatted_course_qa_value',
-            'course_finalize': 'get_formatted_course_finalize_value',
-            'pm': 'get_formatted_pm_value',
-            'total': 'get_formatted_total_value',
-            'tat': 'get_formatted_tat_value'
-        }
-
-        for attribute in ['course_play_time', 'narration_time', 'embedded_video_time', 'video_count',
-                          'linked_resources', 'total_words', 'ost_elements']:
-
-            requirements = requirements_dict[attribute]
-            for item in requirements:
-                requirement = columns_dict[item]
-                value = getattr(obj, attribute)
-                if value > 0 and requirement not in target_fields:
-                    target_fields.append(requirement)
-                # elif value == 0 and requirement in target_fields:
-                #     related_keys = [k for k, v in requirements_dict.iteritems() if item in v]
-                #     sum_of_vals = 0
-                #     for key in related_keys:
-                #         sum_of_vals += getattr(obj, key)
-                #     if sum_of_vals == 0:
-                #         target_fields.remove(requirement)
-
-        if len(target_fields) > 1:
-            target_fields.append(columns_dict['pm'])
-            target_fields.append(columns_dict['total'])
-            target_fields.append(columns_dict['tat'])
-
-        # if len(target_fields) == 4:
-        #     target_fields.remove(columns_dict['pm'])
-        #     target_fields.remove(columns_dict['total'])
-        #     target_fields.remove(columns_dict['tat'])
-
-        course_items = ['get_formatted_mm_prep_value', 'get_formatted_vo_prep_value', 'get_formatted_video_loc_value',
-                        'get_formatted_dtp_value', 'get_formatted_course_build_value', 'get_formatted_course_qa_value']
-
-        has_course = any((True for field in target_fields if field in course_items))
-        if 'get_formatted_course_finalize_value' not in target_fields:
-            if has_course:
-                target_fields.append('get_formatted_course_finalize_value')
-        else:
-            if not has_course:
-                target_fields.remove('get_formatted_course_finalize_value')
-
-        if read_only:
-            sorted_target_fields = []
-        else:
-            sorted_target_fields = ['language']
-
-        columns_list = ['get_formatted_prep_kits_value', 'get_formatted_trans_value', 'get_formatted_mm_prep_value',
-                        'get_formatted_vo_prep_value', 'get_formatted_video_loc_value', 'get_formatted_dtp_value',
-                        'get_formatted_course_build_value', 'get_formatted_course_qa_value',
-                        'get_formatted_course_finalize_value', 'get_formatted_pm_value', 'get_formatted_total_value',
-                        'get_formatted_tat_value']
-
-        for item in columns_list:
-            if item in target_fields:
-                sorted_target_fields.append(item)
-
-        return sorted_target_fields
-
     def get_fields(self, request, obj=None):
         # retrieve current fields
         target_fields = super(DynamicPricingInline, self).get_fields(request, obj)
-        target_fields[:] = []
+        # Filter list of column fields based on current context
         return self.filter_fields(target_fields, obj, read_only=False)
 
     def get_readonly_fields(self, request, obj=None):
         # retrieve current readonly fields
         target_fields = super(DynamicPricingInline, self).get_readonly_fields(request, obj)
-        target_fields[:] = []
+        # Filter list of read-only column fields based on current context
         return self.filter_fields(target_fields, obj)
+
+    def filter_fields(self, target_fields, obj, read_only=True):
+        # Reset target column fields list to empty
+        target_fields[:] = []
+        # Maps UI columns to their data inputs in scoping object fields
+        requirements_dict = {}
+        # Prep Kits
+        requirements_dict.setdefault('course_play_time', []).append('prep_kits')
+        # Translation
+        requirements_dict.setdefault('total_words', []).append('translation')
+        # MM Prep
+        requirements_dict.setdefault('video_count', []).append('mm_prep')
+        requirements_dict.setdefault('narration_time', []).append('mm_prep')
+        # VO Prep
+        requirements_dict.setdefault('narration_time', []).append('vo_prep')
+        # Video Loc
+        requirements_dict.setdefault('ost_elements', []).append('video_loc')
+        requirements_dict.setdefault('video_count', []).append('video_loc')
+        # DTP
+        requirements_dict.setdefault('linked_resources', []).append('dtp')
+        # Course Build
+        requirements_dict.setdefault('course_play_time', []).append('course_build')
+        requirements_dict.setdefault('narration_time', []).append('course_build')
+        # Course QA
+        requirements_dict.setdefault('course_play_time', []).append('course_qa')
+
+        # Maps UI columns to the functions that calculate their value
+        # See above PricingInline class and models Pricing class for functions
+        columns_list = [('prep_kits', 'get_formatted_prep_kits_value'),
+                        ('translation', 'get_formatted_trans_value'),
+                        ('mm_prep', 'get_formatted_mm_prep_value'),
+                        ('vo_prep', 'get_formatted_vo_prep_value'),
+                        ('video_loc', 'get_formatted_video_loc_value'),
+                        ('dtp', 'get_formatted_dtp_value'),
+                        ('course_build', 'get_formatted_course_build_value'),
+                        ('course_qa', 'get_formatted_course_qa_value'),
+                        ('course_finalize', 'get_formatted_course_finalize_value'),
+                        ('pm', 'get_formatted_pm_value'),
+                        ('total', 'get_formatted_total_value'),
+                        ('tat', 'get_formatted_tat_value')]
+
+        columns_dict = dict(columns_list)
+
+        # At runtime, filters UI columns to include only those connected to Scoping fields with values
+        for field in obj._meta.get_fields():
+            if field.name in requirements_dict and getattr(obj, field.name) > 0:
+                requirements = requirements_dict[field.name]
+                for item in requirements:
+                    requirement = columns_dict[item]
+                    if requirement not in target_fields:
+                        target_fields.append(requirement)
+
+        # Automatically show PM, Total and TAT columns when columns (other than language column) exist
+        if len(target_fields) > 1:
+            target_fields.append(columns_dict['pm'])
+            target_fields.append(columns_dict['total'])
+            target_fields.append(columns_dict['tat'])
+
+        # Show COURSE FINALIZE column only when there are course-related columns
+        course_items = dict(columns_list[2:8]).values()
+        has_course = any((True for field in target_fields if field in course_items))
+        if 'get_formatted_course_finalize_value' not in target_fields and has_course:
+            target_fields.append('get_formatted_course_finalize_value')
+
+        # All columns except LANGUAGE will be read-only
+        if read_only:
+            sorted_target_fields = []
+        else:
+            sorted_target_fields = ['language']
+
+        for item in columns_list:
+            if item[1] in target_fields:
+                sorted_target_fields.append(item[1])
+
+        return sorted_target_fields
 
 
 class ScopingAdmin(admin.ModelAdmin):
@@ -291,6 +283,10 @@ class ScopingAdmin(admin.ModelAdmin):
             c = Context({'inline_admin_formset': inline_admin_formset})
             rendered_inline_form = t.render(c)
             return JsonResponse({'status': 'languages updated!', 'inline_form': rendered_inline_form})
+
+        if "_save" in request.POST:
+            return HttpResponseRedirect("../../%s" % obj.id)
+
         return super(ScopingAdmin, self).response_change(request, obj)
 
     class Media:
