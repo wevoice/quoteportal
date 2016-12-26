@@ -47,27 +47,6 @@ class Language(models.Model):
         return self.name
 
 
-class PDFAsset(models.Model):
-    YES_NO_CHOICES = (
-        ("Y", "Yes"),
-        ("N", "No")
-    )
-
-    name = models.CharField(max_length=128)
-    no_of_files = models.IntegerField(blank=True, null=True, default=0)
-    est_total_wordcount = models.IntegerField(blank=True, null=True, default=0)
-    actual_total_wordcount = models.IntegerField(blank=True, null=True, default=0)
-    ts_request = models.ForeignKey("Scoping")
-    editable_pdf_source_available = models.CharField(max_length=16, choices=YES_NO_CHOICES, blank=True, null=True)
-    path_to_source = models.CharField(max_length=128, blank=True, null=True)
-
-    def __unicode__(self):
-        return self.name
-
-    class Meta:
-        verbose_name_plural = "PDFs"
-
-
 class Scoping(models.Model):
 
     YES_NO_CHOICES = (

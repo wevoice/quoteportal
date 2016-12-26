@@ -58,11 +58,6 @@ class SlaAdmin(ImportExportActionModelAdmin):
 admin.site.register(models.Sla, SlaAdmin)
 
 
-class DTPAssetInline(admin.StackedInline):
-    model = models.PDFAsset
-    extra = 0
-
-
 class PricingInlineForm(forms.ModelForm):
     def clean(self):
         if self.is_valid():
