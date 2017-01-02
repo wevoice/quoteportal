@@ -226,8 +226,13 @@ class DynamicPricingInline(PricingInline):
         return sorted_target_fields
 
 
+class DTPAssetInline(admin.StackedInline):
+    model = models.DTPAsset
+    extra = 0
+
+
 class ScopingAdmin(admin.ModelAdmin):
-    inlines = [DynamicPricingInline, ]
+    inlines = [DTPAssetInline, DynamicPricingInline]
 
     fieldsets = (
         (None, {
@@ -284,7 +289,7 @@ class ScopingAdmin(admin.ModelAdmin):
             rendered_inline_form = t.render(c)
             return JsonResponse({'status': 'languages updated!', 'inline_form': rendered_inline_form})
 
-        if "_save" in request.POST:
+        if not request.is_ajax() and "_save" in request.POST:
             return HttpResponseRedirect("../../%s" % obj.id)
 
         return super(ScopingAdmin, self).response_change(request, obj)

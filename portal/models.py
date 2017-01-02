@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 
 from django.db import models
+from django.db.models import Sum
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils.timezone import get_current_timezone
@@ -47,6 +48,25 @@ class Language(models.Model):
         return self.name
 
 
+class DTPAsset(models.Model):
+    YES_NO_CHOICES = (
+        ("Y", "Yes"),
+        ("N", "No")
+    )
+
+    name = models.CharField(max_length=128)
+    scoping = models.ForeignKey("Scoping")
+    total_pages = models.IntegerField(blank=True, null=True, default=0)
+    total_wordcount = models.IntegerField(blank=True, null=True, default=0)
+    editable_source_available = models.CharField(max_length=16, choices=YES_NO_CHOICES, blank=True, null=True)
+
+    def __unicode__(self):
+        return self.name
+
+    class Meta:
+        verbose_name_plural = "DTP Assets"
+
+
 class Scoping(models.Model):
 
     YES_NO_CHOICES = (
@@ -71,8 +91,11 @@ class Scoping(models.Model):
         return localize_datetime(self.created)
 
     def get_total_words(self):
+        dtp_assets = self.dtpasset_set.aggregate(Sum('total_pages'))['total_pages__sum']
         return math.ceil(sum([(self.course_play_time * 92), (self.narration_time * 150), (self.embedded_video_time * 8),
-                              (self.linked_resources * 300)]))
+                             (dtp_assets * 300)]))
+        #  return math.ceil(sum([(self.course_play_time * 92), (self.narration_time * 150), (self.embedded_video_time * 8),
+        #                      (self.linked_resources * 300)]))
 
     def get_ost_elements(self):
         return math.ceil(self.embedded_video_time * 2.5)

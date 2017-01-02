@@ -23,8 +23,8 @@ if (typeof django != 'undefined') {
             * @param response.inline_form   formset row returned in ajax call
             */
             if (response.status == "languages updated!"){
-                var current_inlines = $('.inline-related');
-                var response_inlines = $(response.inline_form).find('.inline-related');
+                var current_inlines = $('.tabular.inline-related');
+                var response_inlines = $(response.inline_form).find('.tabular.inline-related');
                 current_inlines[0].innerHTML = response_inlines[0].innerHTML;
             } else {
                 var estimate_url = $(response).find('.messagelist a').attr('href');
