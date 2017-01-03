@@ -89,51 +89,51 @@ class PricingInline(admin.TabularInline):
     #     return formset
 
     def get_formatted_prep_kits_value(self, obj):
-        return "$%s" % intcomma('{0:.2f}'.format(obj.get_prep_kits_value()))
+        return "$%s" % intcomma('{0:.2f}'.format(obj.values.prep_kits_value))
     get_formatted_prep_kits_value.short_description = 'Prep Kits'
 
     def get_formatted_trans_value(self, obj):
-        return "$%s" % intcomma('{0:.2f}'.format(obj.get_trans_value()))
+        return "$%s" % intcomma('{0:.2f}'.format(obj.values.translation_value))
     get_formatted_trans_value.short_description = 'Translation'
 
     def get_formatted_mm_prep_value(self, obj):
-        return "$%s" % intcomma('{0:.2f}'.format(obj.get_mm_prep_value()))
+        return "$%s" % intcomma('{0:.2f}'.format(obj.values.mm_prep_value))
     get_formatted_mm_prep_value.short_description = 'MM Prep'
 
     def get_formatted_vo_prep_value(self, obj):
-        return "$%s" % intcomma('{0:.2f}'.format(obj.get_vo_prep_value()))
+        return "$%s" % intcomma('{0:.2f}'.format(obj.values.vo_prep_value))
     get_formatted_vo_prep_value.short_description = 'VO Prep'
 
     def get_formatted_video_loc_value(self, obj):
-        return "$%s" % intcomma('{0:.2f}'.format(obj.get_video_loc_value()))
+        return "$%s" % intcomma('{0:.2f}'.format(obj.values.video_loc_value))
     get_formatted_video_loc_value.short_description = 'Video Loc'
 
     def get_formatted_dtp_value(self, obj):
-        return "$%s" % intcomma('{0:.2f}'.format(obj.get_dtp_value()))
+        return "$%s" % intcomma('{0:.2f}'.format(obj.values.dtp_value))
     get_formatted_dtp_value.short_description = 'DTP'
 
     def get_formatted_course_build_value(self, obj):
-        return "$%s" % intcomma('{0:.2f}'.format(obj.get_course_build_value()))
+        return "$%s" % intcomma('{0:.2f}'.format(obj.values.course_build_value))
     get_formatted_course_build_value.short_description = 'Course Build'
 
     def get_formatted_course_qa_value(self, obj):
-        return "$%s" % intcomma('{0:.2f}'.format(obj.get_course_qa_value()))
+        return "$%s" % intcomma('{0:.2f}'.format(obj.values.course_qa_value))
     get_formatted_course_qa_value.short_description = 'Course QA'
 
     def get_formatted_course_finalize_value(self, obj):
-        return "$%s" % intcomma('{0:.2f}'.format(obj.get_course_finalize_value()))
+        return "$%s" % intcomma('{0:.2f}'.format(obj.values.course_finalize_value))
     get_formatted_course_finalize_value.short_description = 'Course Finalize'
 
     def get_formatted_pm_value(self, obj):
-        return "$%s" % intcomma('{0:.2f}'.format(obj.get_pm_value()))
+        return "$%s" % intcomma('{0:.2f}'.format(obj.values.pm_value))
     get_formatted_pm_value.short_description = 'PM'
 
     def get_formatted_total_value(self, obj):
-        return "$%s" % intcomma('{0:.2f}'.format(obj.get_total_value()))
+        return "$%s" % intcomma('{0:.2f}'.format(obj.values.total_value))
     get_formatted_total_value.short_description = 'Total'
 
     def get_formatted_tat_value(self, obj):
-        return "%s" % intcomma('{0:.2f}'.format(obj.get_tat_value()))
+        return "%s" % intcomma('{0:.2f}'.format(obj.values.tat_value))
     get_formatted_tat_value.short_description = 'TAT'
 
 

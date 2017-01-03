@@ -128,29 +128,41 @@ class PricingValue(object):
     def __init__(self, pricing):
         self.pricing = pricing
         self.sla_lang = self.get_sla_lang()
+        self.prep_kits_value = self.get_prep_kits_value()
         self.translation_value = self.get_translation_value()
         self.mm_prep_value = self.get_mm_prep_value()
         self.vo_prep_value = self.get_vo_prep_value()
         self.video_loc_value = self.get_video_loc_value()
+        self.dtp_value = self.get_dtp_value()
+        self.course_build_value = self.get_course_build_value()
+        self.course_qa_value = self.get_course_qa_value()
+        self.course_finalize_value = self.get_course_finalize_value()
+        self.pm_value = self.get_pm_value()
+        self.total_value = self.get_total_value()
+        self.tat_value = self.get_tat_value()
 
     def get_sla_lang(self):
         if self.pricing.language.code != 'en-US':
             lang = self.pricing.language.id
-            sla_lang = self.pricing.scoping.client.sla_set.filter(target_language_id=lang)
+            sla_lang = self.pricing.scoping.client.sla_set.filter(target_language_id=lang)[0]
         else:
             sla_lang = None
         return sla_lang
 
+    def get_prep_kits_value(self):
+        if self.sla_lang:
+            return mround((self.pricing.scoping.course_play_time * 4.0)/60)*60
+        return 0.00
+
     def get_translation_value(self):
         if self.sla_lang:
-            rate = self.sla_lang[0].no_match
-            value = self.pricing.scoping.total_words * float(rate)
-            return value
+            rate = self.sla_lang.no_match
+            return self.pricing.scoping.total_words * float(rate)
         return 0.00
 
     def get_mm_prep_value(self):
         if self.sla_lang:
-            rate = self.sla_lang[0].mm_eng
+            rate = self.sla_lang.mm_eng
             value = (mround((self.pricing.scoping.narration_time * 2.0) / 60) * float(rate)) \
                 + (math.ceil((self.pricing.scoping.video_count / 5.0)) * float(rate))
             if self.pricing.scoping.transcription == "Y":
@@ -160,18 +172,86 @@ class PricingValue(object):
 
     def get_vo_prep_value(self):
         if self.sla_lang:
-            rate = self.sla_lang[0].audio_recording_plain
-            value = self.pricing.scoping.narration_time * float(rate)
-            return value
+            rate = self.sla_lang.audio_recording_plain
+            return self.pricing.scoping.narration_time * float(rate)
         return 0.00
 
     def get_video_loc_value(self):
         if self.sla_lang:
-            rate = self.sla_lang[0].mm_eng
-            value = (mround(self.pricing.scoping.ost_elements / 10.0, prec=2, base=1) * float(rate)) \
+            rate = self.sla_lang.mm_eng
+            return (mround(self.pricing.scoping.ost_elements / 10.0, prec=2, base=1) * float(rate)) \
                 + float(0.25 * self.pricing.scoping.video_count * float(rate))
-            return value
         return 0.00
+
+    def get_dtp_value(self):
+        if self.sla_lang:
+            dtp_assets = self.pricing.scoping.dtpasset_set.aggregate(Sum('total_pages'))['total_pages__sum']
+            rate = self.sla_lang.dtp
+            # return mround(self.pricing.scoping.linked_resources / 15.0)*float(rate)
+            return mround(dtp_assets / 15.0)*float(rate)
+        return 0.00
+
+    def get_course_build_value(self):
+        if self.sla_lang:
+            rate = self.sla_lang.mm_eng
+            return mround(self.pricing.scoping.course_play_time / 15.0
+                          + self.pricing.scoping.narration_time / 10.0, prec=2, base=1) * float(rate)
+        return 0.00
+
+    def get_course_qa_value(self):
+        if self.sla_lang:
+            rate = self.sla_lang.qa
+            return mround(self.pricing.scoping.course_play_time * 5.0/60) * float(rate)
+        return 0.00
+
+    def get_course_finalize_value(self):
+        if self.sla_lang:
+            return sum([self.get_mm_prep_value(), self.get_vo_prep_value(), self.get_video_loc_value(),
+                        self.get_dtp_value(), self.get_course_build_value(), self.get_course_qa_value()]) * 0.25
+        return 0.00
+
+    def get_pm_value(self):
+        if self.sla_lang:
+            rate = self.sla_lang.pm
+            base_value = sum([self.get_translation_value(), self.get_mm_prep_value(), self.get_vo_prep_value(),
+                              self.get_video_loc_value(), self.get_dtp_value(), self.get_course_build_value(),
+                              self.get_course_qa_value(), self.get_course_finalize_value()]) * float(rate)
+            value = float(format(base_value, '.2f'))
+        else:
+            value = float(format(self.get_prep_kits_value() * .08, '.2f'))
+        return value
+
+    def get_total_value(self):
+        if self.sla_lang:
+            value = sum([self.get_translation_value(), self.get_mm_prep_value(), self.get_vo_prep_value(),
+                         self.get_video_loc_value(), self.get_dtp_value(), self.get_course_build_value(),
+                         self.get_course_qa_value(), self.get_course_finalize_value(), self.get_pm_value()])
+        else:
+            value = sum([self.get_prep_kits_value(), self.get_pm_value()])
+        return value
+
+    def get_tat_value_base(self, tat_unit):
+        tat_value = 3
+        if tat_unit < 120:
+            tat_value = 1
+        elif tat_unit < 180:
+            tat_value = 2
+        return tat_value
+
+    def get_tat_value(self):
+        if self.sla_lang:
+            tat_value = 3
+            if self.pricing.scoping.course_play_time < 180:
+                tat_value = 1
+            elif self.pricing.scoping.course_play_time < 360:
+                tat_value = 2
+        else:
+            tat_value = math.ceil(sum([self.pricing.scoping.total_words / 2000,
+                                       6,
+                                       self.get_tat_value_base(self.pricing.scoping.embedded_video_time),
+                                       math.ceil(self.pricing.scoping.course_play_time / 15),
+                                       2]) * 1.2)
+        return tat_value
 
 
 class Pricing(models.Model):
@@ -200,115 +280,10 @@ class Pricing(models.Model):
     def values(self):
         return PricingValue(self)
 
-    def get_prep_kits_value(self):
-        if self.language.code == 'en-US':
-            prep_kits_value = mround((self.scoping.course_play_time * 4.0)/60)*60
-        else:
-            prep_kits_value = 0.00
-        return prep_kits_value
-
-    def get_trans_value(self):
-        return self.values.translation_value
-
-    def get_mm_prep_value(self):
-        return self.values.mm_prep_value
-
-    def get_vo_prep_value(self):
-        return self.values.vo_prep_value
-
-    def get_video_loc_value(self):
-        return self.values.video_loc_value
-
-    def get_dtp_value(self):
-        if self.language.code != 'en-US':
-            lang = self.language.id
-            sla_lang = self.scoping.client.sla_set.filter(target_language_id=lang)
-            dtp_rate = sla_lang[0].dtp
-            dtp_value = mround(self.scoping.linked_resources / 15.0)*float(dtp_rate)
-        else:
-            dtp_value = 0.00
-        return dtp_value
-
-    def get_course_build_value(self):
-        if self.language.code != 'en-US':
-            lang = self.language.id
-            sla_lang = self.scoping.client.sla_set.get(target_language_id=lang)
-            mm_eng_rate = sla_lang.mm_eng
-            course_build_value = mround(self.scoping.course_play_time / 15.0
-                                        + self.scoping.narration_time / 10.0, prec=2, base=1) * float(mm_eng_rate)
-        else:
-            course_build_value = 0.00
-        return course_build_value
-
-    def get_course_qa_value(self):
-        if self.language.code != 'en-US':
-            lang = self.language.id
-            sla_lang = self.scoping.client.sla_set.get(target_language_id=lang)
-            qa_rate = sla_lang.qa
-            course_qa_value = mround(self.scoping.course_play_time * 5.0/60) * float(qa_rate)
-        else:
-            course_qa_value = 0.00
-        return course_qa_value
-
-    def get_course_finalize_value(self):
-        if self.language.code != 'en-US':
-            course_finalize_value = sum([self.get_mm_prep_value(), self.get_vo_prep_value(), self.get_video_loc_value(),
-                                         self.get_dtp_value(), self.get_course_build_value(), self.get_course_qa_value()
-                                         ]) * 0.25
-        else:
-            course_finalize_value = 0.00
-        return course_finalize_value
-
-    def get_pm_value(self):
-        if self.language.code != 'en-US':
-            lang = self.language.id
-            sla_lang = self.scoping.client.sla_set.get(target_language_id=lang)
-            pm_rate = sla_lang.pm
-            base_value = sum([self.get_trans_value(), self.get_mm_prep_value(), self.get_vo_prep_value(),
-                              self.get_video_loc_value(), self.get_dtp_value(), self.get_course_build_value(),
-                              self.get_course_qa_value(), self.get_course_finalize_value()]) * float(pm_rate)
-            pm_value = float(format(base_value, '.2f'))
-        else:
-            pm_value = float(format(self.get_prep_kits_value() * .08, '.2f'))
-        return pm_value
-
-    def get_total_value(self):
-        if self.language.code != 'en-US':
-            total = sum([self.get_trans_value(), self.get_mm_prep_value(), self.get_vo_prep_value(),
-                         self.get_video_loc_value(), self.get_dtp_value(), self.get_course_build_value(),
-                         self.get_course_qa_value(), self.get_course_finalize_value(), self.get_pm_value()])
-        else:
-            total = sum([self.get_prep_kits_value(), self.get_pm_value()])
-        return total
-
-    def get_tat_value_base(self, tat_unit):
-        tat_value = 3
-        if tat_unit < 120:
-            tat_value = 1
-        elif tat_unit < 180:
-            tat_value = 2
-        return tat_value
-
-    def get_tat_value(self):
-        if self.language.code == 'en-US':
-            tat_value = 3
-            if self.scoping.course_play_time < 180:
-                tat_value = 1
-            elif self.scoping.course_play_time < 360:
-                tat_value = 2
-        else:
-            tat_value = math.ceil(sum([self.scoping.total_words/2000,
-                                       6,
-                                       self.get_tat_value_base(self.scoping.embedded_video_time),
-                                       math.ceil(self.scoping.course_play_time/15),
-                                       2
-                                       ]) * 1.2)
-        return tat_value
-
     def save(self, *args, **kwargs):
-        self.prep_kits = self.get_prep_kits_value()
-        self.translation = self.get_trans_value()
-        self.mm_prep = self.get_mm_prep_value()
+        self.prep_kits = self.values.prep_kits_value
+        self.translation = self.values.translation_value
+        self.mm_prep = self.values.mm_prep_value
         super(Pricing, self).save(*args, **kwargs)
 
     class Meta:
