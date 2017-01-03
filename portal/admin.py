@@ -298,8 +298,11 @@ class ScopingAdmin(admin.ModelAdmin):
         def __init__(self):
             pass
         js = ('portal/admin/js/admin_list_editable_autosubmit.js',
-              'portal/admin/js/formset_handlers.js')
-        css = {'all': ('portal/admin/css/scoping.css', )}
+              'portal/admin/js/formset_handlers.js',
+              'portal/admin/js/django_admin_collapsed_inlines.js')
+        css = {'all': ('portal/admin/css/scoping.css',
+                       'portal/admin/css/django_admin_collapsed_inlines.css'
+                       )}
 
 
 admin.site.register(models.Scoping, ScopingAdmin)

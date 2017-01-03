@@ -1,0 +1,18 @@
+/* COLLAPSED INLINES */
+
+.inline-group .collapsed {
+    display: none;
+}
+
+.add-row {
+    display: none
+}
+
+.inline-group .inline_collapse-toggle {
+    float: right;
+}
+
+a.inline_collapse-toggle {
+    color: #5B80B2;
+    text-decoration: none;
+}

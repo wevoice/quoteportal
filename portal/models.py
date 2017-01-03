@@ -124,6 +124,56 @@ def create_source_language(sender, instance, created, **kwargs):
         pricing.save()
 
 
+class PricingValue(object):
+    def __init__(self, pricing):
+        self.pricing = pricing
+        self.sla_lang = self.get_sla_lang()
+        self.translation_value = self.get_translation_value()
+        self.mm_prep_value = self.get_mm_prep_value()
+        self.vo_prep_value = self.get_vo_prep_value()
+        self.video_loc_value = self.get_video_loc_value()
+
+    def get_sla_lang(self):
+        if self.pricing.language.code != 'en-US':
+            lang = self.pricing.language.id
+            sla_lang = self.pricing.scoping.client.sla_set.filter(target_language_id=lang)
+        else:
+            sla_lang = None
+        return sla_lang
+
+    def get_translation_value(self):
+        if self.sla_lang:
+            rate = self.sla_lang[0].no_match
+            value = self.pricing.scoping.total_words * float(rate)
+            return value
+        return 0.00
+
+    def get_mm_prep_value(self):
+        if self.sla_lang:
+            rate = self.sla_lang[0].mm_eng
+            value = (mround((self.pricing.scoping.narration_time * 2.0) / 60) * float(rate)) \
+                + (math.ceil((self.pricing.scoping.video_count / 5.0)) * float(rate))
+            if self.pricing.scoping.transcription == "Y":
+                value += self.pricing.scoping.narration_time * 5.0
+            return value
+        return 0.00
+
+    def get_vo_prep_value(self):
+        if self.sla_lang:
+            rate = self.sla_lang[0].audio_recording_plain
+            value = self.pricing.scoping.narration_time * float(rate)
+            return value
+        return 0.00
+
+    def get_video_loc_value(self):
+        if self.sla_lang:
+            rate = self.sla_lang[0].mm_eng
+            value = (mround(self.pricing.scoping.ost_elements / 10.0, prec=2, base=1) * float(rate)) \
+                + float(0.25 * self.pricing.scoping.video_count * float(rate))
+            return value
+        return 0.00
+
+
 class Pricing(models.Model):
     scoping = models.ForeignKey("Scoping", blank=True, null=True)
     language = models.ForeignKey("Language", blank=True, null=True)
@@ -146,6 +196,10 @@ class Pricing(models.Model):
     def created_tz(self):
         return localize_datetime(self.created)
 
+    @property
+    def values(self):
+        return PricingValue(self)
+
     def get_prep_kits_value(self):
         if self.language.code == 'en-US':
             prep_kits_value = mround((self.scoping.course_play_time * 4.0)/60)*60
@@ -154,48 +208,16 @@ class Pricing(models.Model):
         return prep_kits_value
 
     def get_trans_value(self):
-        if self.language.code != 'en-US':
-            lang = self.language.id
-            sla_lang = self.scoping.client.sla_set.filter(target_language_id=lang)
-            rate = sla_lang[0].no_match
-            translation_value = self.scoping.total_words * float(rate)
-        else:
-            translation_value = 0.00
-        return translation_value
+        return self.values.translation_value
 
     def get_mm_prep_value(self):
-        if self.language.code != 'en-US':
-            lang = self.language.id
-            sla_lang = self.scoping.client.sla_set.filter(target_language_id=lang)
-            mm_eng_rate = sla_lang[0].mm_eng
-            prep_kits_value = (mround((self.scoping.narration_time * 2.0)/60)*float(mm_eng_rate))\
-                + (math.ceil((self.scoping.video_count/5.0))*float(mm_eng_rate))
-            if self.scoping.transcription == "Y":
-                prep_kits_value += self.scoping.narration_time * 5.0
-        else:
-            prep_kits_value = 0.00
-        return prep_kits_value
+        return self.values.mm_prep_value
 
     def get_vo_prep_value(self):
-        if self.language.code != 'en-US':
-            lang = self.language.id
-            sla_lang = self.scoping.client.sla_set.filter(target_language_id=lang)
-            vo_rate = sla_lang[0].audio_recording_plain
-            vo_prep_value = self.scoping.narration_time * float(vo_rate)
-        else:
-            vo_prep_value = 0.00
-        return vo_prep_value
+        return self.values.vo_prep_value
 
     def get_video_loc_value(self):
-        if self.language.code != 'en-US':
-            lang = self.language.id
-            sla_lang = self.scoping.client.sla_set.filter(target_language_id=lang)
-            mm_eng_rate = sla_lang[0].mm_eng
-            video_loc_value = (mround(self.scoping.ost_elements / 10.0, prec=2, base=1)*float(mm_eng_rate))\
-                + float(0.25 * self.scoping.video_count * float(mm_eng_rate))
-        else:
-            video_loc_value = 0.00
-        return video_loc_value
+        return self.values.video_loc_value
 
     def get_dtp_value(self):
         if self.language.code != 'en-US':
