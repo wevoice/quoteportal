@@ -8,7 +8,6 @@ from django.conf import settings
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
     url(r'^ajax_select/', include(ajax_select_urls)),
-    url(r'^portal/', include('portal.urls'))
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 admin.site.site_header = "Self-service Quote Portal"
