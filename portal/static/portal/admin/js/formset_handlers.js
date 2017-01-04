@@ -52,7 +52,16 @@ if (typeof django != 'undefined') {
                     form_ajax_submit(false);
                 }
             }
-        })
+        });
+
+        $(document).ready(function() {
+            $('.tooltip').tooltipster({
+                animation: 'swing',
+                delay: 200,
+                maxWidth: 250,
+                theme: 'tooltipster-light'
+            });
+        });
 
     })(django.jQuery);
 }

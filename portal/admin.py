@@ -299,10 +299,15 @@ class ScopingAdmin(admin.ModelAdmin):
             pass
         js = ('portal/admin/js/admin_list_editable_autosubmit.js',
               'portal/admin/js/formset_handlers.js',
-              'portal/admin/js/django_admin_collapsed_inlines.js')
-        css = {'all': ('portal/admin/css/scoping.css',
-                       'portal/admin/css/django_admin_collapsed_inlines.css'
-                       )}
+              'portal/admin/js/django_admin_collapsed_inlines.js',
+              'portal/admin/js/tooltipster.bundle.min.js',
+              )
+        css = {
+            'all': (
+                'portal/admin/css/scoping.css',
+                'portal/admin/css/tooltipster.bundle.min.css'
+            )
+        }
 
 
 admin.site.register(models.Scoping, ScopingAdmin)

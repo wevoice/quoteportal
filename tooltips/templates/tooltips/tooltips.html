@@ -1,0 +1,12 @@
+<script type='text/javascript'>
+// <![CDATA[
+(function($) {
+    $(document).ready(function() {
+        {% for tooltip in tooltips %}
+            $('{{tooltip.selector|safe}}').addClass( 'tooltip' );
+            $('{{tooltip.selector|safe}}').attr( "title", "{{tooltip.body}}" );
+        {% endfor %}
+    });
+})(django.jQuery);
+// ]]>
+</script>
